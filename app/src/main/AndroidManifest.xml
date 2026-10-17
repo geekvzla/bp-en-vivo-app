@@ -42,17 +42,22 @@
             android:name=".ThundernetLoginActivity"
             android:exported="false" />
 
-        <!-- Android TV / Fire TV Stick -->
+        <!-- Android TV / Fire TV Stick: split-screen guía + preview -->
         <activity
-            android:name=".tv.TvMainActivity"
+            android:name=".tv.TvSplitActivity"
             android:exported="true"
-            android:banner="@drawable/tv_banner"
-            android:theme="@style/Theme.Leanback.Browse">
+            android:banner="@drawable/tv_banner">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- TV anterior (BrowseSupportFragment) -->
+        <activity
+            android:name=".tv.TvMainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Leanback.Browse" />
 
     </application>
 </manifest>
