@@ -38,8 +38,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsBackupCount: TextView
     private lateinit var settingsClearBackup: Button
 
-    private val adapter = StreamAdapter { openPlayer(it) }
+    private val adapter = StreamAdapter { previewChannel(it) }
     private var lastItems: List<StreamItem> = emptyList()
+
+    // Preview
+    private var previewPlayer: androidx.media3.exoplayer.ExoPlayer? = null
+    private lateinit var previewContainer: View
+    private lateinit var previewView: androidx.media3.ui.PlayerView
+    private lateinit var previewTitle: TextView
+    private lateinit var previewMaximize: Button
+    private var previewItem: StreamItem? = null
 
     private val loginLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -64,6 +72,15 @@ class MainActivity : AppCompatActivity() {
         settingsVersion = findViewById(R.id.settings_version)
         settingsBackupCount = findViewById(R.id.settings_backup_count)
         settingsClearBackup = findViewById(R.id.settings_clear_backup)
+
+        // Preview
+        previewContainer = findViewById(R.id.preview_container)
+        previewView = findViewById(R.id.preview_player)
+        previewTitle = findViewById(R.id.preview_title)
+        previewMaximize = findViewById(R.id.preview_maximize)
+        previewMaximize.setOnClickListener {
+            previewItem?.let { openPlayer(it) }
+        }
 
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
@@ -169,6 +186,44 @@ class MainActivity : AppCompatActivity() {
         settingsVersion.text = getString(R.string.app_version, BuildConfig.VERSION_NAME)
         val count = ChannelBackup.load().size
         settingsBackupCount.text = getString(R.string.backup_count, count)
+    }
+
+    /** Carga el canal en el preview superior (sin abrir pantalla completa). */
+    private fun previewChannel(item: StreamItem) {
+        previewItem = item
+        previewContainer.visibility = View.VISIBLE
+        val displayName = listOfNotNull(
+            item.channel?.takeIf { it.isNotBlank() },
+            item.programa?.takeIf { it.isNotBlank() }
+        ).joinToString(" • ").takeIf { it.isNotBlank() } ?: item.title
+        previewTitle.text = displayName
+        // Libera el anterior y crea uno nuevo silenciado para el preview
+        previewPlayer?.release()
+        previewPlayer = androidx.media3.exoplayer.ExoPlayer.Builder(this).build().apply {
+            volume = 0f // preview silenciado
+            previewView.player = this
+        }
+        Thread {
+            val url = runCatching {
+                when (source) {
+                    Source.BEISBOLPLAY -> DailymotionClient.extractStreamUrl(item.id)
+                    Source.THUNDERNET -> ThundernetClient.getChannelStream(item.id).url
+                }
+            }.getOrNull() ?: return@Thread
+            runOnUiThread {
+                val exo = previewPlayer ?: return@runOnUiThread
+                val mediaItem = androidx.media3.common.MediaItem.fromUri(url)
+                exo.setMediaItem(mediaItem)
+                exo.prepare()
+                exo.play()
+            }
+        }.start()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        previewPlayer?.release()
+        previewPlayer = null
     }
 
     private fun openPlayer(item: StreamItem) {        val ids = ArrayList(lastItems.map { it.id })
