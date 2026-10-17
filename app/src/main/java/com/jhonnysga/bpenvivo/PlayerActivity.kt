@@ -405,7 +405,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun updateQualityLabel() {
         val q = currentQuality()
-        qualityButton.text = if (q == "auto") "⚙ Auto" else "⚙ ${q}p"
+        qualityButton.text = if (q == "auto") "⚙ Calidad: Auto" else "⚙ Calidad: ${q}p"
     }
 
     /**
