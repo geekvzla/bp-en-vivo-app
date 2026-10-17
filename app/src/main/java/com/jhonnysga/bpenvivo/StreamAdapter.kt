@@ -51,11 +51,15 @@ class StreamAdapter(private val onClick: (StreamItem) -> Unit) :
         fun bind(s: StreamItem) {
             item = s
             title.text = s.title
-            if (s.channel.isNullOrBlank()) {
+            val canalPrograma = listOfNotNull(
+                s.channel?.takeIf { it.isNotBlank() },
+                s.programa?.takeIf { it.isNotBlank() }
+            ).joinToString(" • ")
+            if (canalPrograma.isBlank()) {
                 channel.visibility = View.GONE
             } else {
                 channel.visibility = View.VISIBLE
-                channel.text = s.channel
+                channel.text = canalPrograma
             }
             ImageLoader.load(s.thumbnail, thumb)
         }

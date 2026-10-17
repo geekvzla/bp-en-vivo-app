@@ -10,5 +10,7 @@ data class StreamItem(
     val title: String,
     val thumbnail: String?,
     val channel: String?,
-    val logo: String?
+    val logo: String?,
+    /** Lo que está transmitiendo ahora (ej: "Navegantes vs Cardenales"). */
+    val programa: String? = null
 )

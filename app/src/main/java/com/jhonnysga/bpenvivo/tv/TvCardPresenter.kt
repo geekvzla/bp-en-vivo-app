@@ -26,7 +26,11 @@ class TvCardPresenter : Presenter() {
         val card = viewHolder.view as ImageCardView
         val stream = item as StreamItem
         card.titleText = stream.title
-        card.contentText = stream.channel?.takeIf { it.isNotBlank() }
+        val canalPrograma = listOfNotNull(
+            stream.channel?.takeIf { it.isNotBlank() },
+            stream.programa?.takeIf { it.isNotBlank() }
+        ).joinToString(" • ")
+        card.contentText = canalPrograma.takeIf { it.isNotBlank() }
             ?: card.context.getString(R.string.live_badge)
         card.mainImageView?.let { ImageLoader.load(stream.thumbnail, it) }
     }

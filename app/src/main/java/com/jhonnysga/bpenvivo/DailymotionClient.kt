@@ -78,7 +78,8 @@ object DailymotionClient {
                     title = title,
                     thumbnail = o.optString("thumbnail_480_url").takeIf { it.isNotBlank() },
                     channel = channelName(title),
-                    logo = null
+                    logo = null,
+                    programa = ProgramMapper.programaPara(id)
                 )
             )
         }
