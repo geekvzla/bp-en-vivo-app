@@ -175,8 +175,12 @@ class PlayerActivity : AppCompatActivity() {
 
     // Fire TV: arriba/abajo del D-pad cambia de canal (zapping) cuando los
     // overlays están ocultos; si están visibles, el D-pad navega la UI.
-    // Cualquier otra tecla muestra los overlays de nuevo.
+    // MENU abre directo el selector de calidad. Cualquier otra tecla muestra los overlays.
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
+            showQualityDialog()
+            return true
+        }
         if ((keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP ||
                     keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) &&
             !overlaysVisible()
@@ -207,10 +211,17 @@ class PlayerActivity : AppCompatActivity() {
         startPlayback()
     }
 
-    /** Banner profesional con número + nombre del canal; se desvanece solo. */
+    /** Banner profesional con número + canal + programa; se desvanece solo. */
     private fun showChannelBanner() {
         bannerNumber.text = (currentIndex + 1).toString()
-        bannerName.text = streamTitle
+        // Muestra "Canal • Programa" usando el mapeo
+        val prog = ProgramMapper.programaPara(streamId)
+        val chan = channelTitles.getOrElse(currentIndex) { "" }
+        bannerName.text = if (!prog.isNullOrBlank() && chan.isNotBlank()) {
+            "$chan • $prog"
+        } else {
+            streamTitle
+        }
         handler.removeCallbacks(bannerHideRunnable)
         channelBanner.visibility = View.VISIBLE
         channelBanner.alpha = 0f
@@ -434,7 +445,7 @@ class PlayerActivity : AppCompatActivity() {
             if (cur == "auto") it.height == -1 else it.height.toString() == cur
         }.coerceAtLeast(0)
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        androidx.appcompat.app.AlertDialog.Builder(this, R.style.QualityDialogTheme)
             .setTitle(R.string.quality_title)
             .setSingleChoiceItems(labels, checked) { dialog, which ->
                 val opt = opts[which]

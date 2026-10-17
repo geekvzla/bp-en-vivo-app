@@ -92,7 +92,6 @@ class TvSplitActivity : FragmentActivity() {
 
         previewPlayer?.release()
         previewPlayer = ExoPlayer.Builder(this).build().apply {
-            volume = 0f
             previewView.player = this
         }
         Thread {

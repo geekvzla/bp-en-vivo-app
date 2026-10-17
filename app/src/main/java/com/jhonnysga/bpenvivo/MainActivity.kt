@@ -200,7 +200,6 @@ class MainActivity : AppCompatActivity() {
         // Libera el anterior y crea uno nuevo silenciado para el preview
         previewPlayer?.release()
         previewPlayer = androidx.media3.exoplayer.ExoPlayer.Builder(this).build().apply {
-            volume = 0f // preview silenciado
             previewView.player = this
         }
         Thread {

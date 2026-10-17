@@ -5,4 +5,11 @@
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@color/background</item>
     </style>
+
+    <!-- Diálogo de calidad con los colores de bplay -->
+    <style name="QualityDialogTheme" parent="Theme.Material3.Dark.Dialog.Alert">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="android:background">@color/surface</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
 </resources>
