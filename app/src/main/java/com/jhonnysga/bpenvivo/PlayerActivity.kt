@@ -56,7 +56,6 @@ class PlayerActivity : AppCompatActivity() {
         private const val MAX_RETRIES = 8
         private const val RETRY_BASE_MS = 2_000L
         private const val RETRY_MAX_MS = 30_000L
-        private const val PREF_QUALITY = "video_quality"
         /** Tiempo sin interacción antes de ocultar título y botón de calidad. */
         private const val OVERLAY_HIDE_MS = 5_000L
         /** Segundos que el banner de canal queda visible al zapear. */
@@ -173,23 +172,72 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
-    // Fire TV: arriba/abajo del D-pad cambia de canal (zapping) cuando los
-    // overlays están ocultos; si están visibles, el D-pad navega la UI.
-    // MENU abre directo el selector de calidad. Cualquier otra tecla muestra los overlays.
+    // Fire TV: arriba/abajo del D-pad cambia de canal AL INSTANTE, siempre
+    // (antes la primera pulsación solo despertaba la UI del reproductor y
+    // el zapeo no ocurría). MENU (☰) u OK sostenido abren el selector de
+    // calidad. OK corto muestra los overlays y enfoca el botón de calidad.
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
-            showQualityDialog()
-            return true
-        }
-        if ((keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP ||
-                    keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) &&
-            !overlaysVisible()
-        ) {
-            zap(if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) 1 else -1)
-            return true
+        when (keyCode) {
+            android.view.KeyEvent.KEYCODE_MENU -> {
+                showQualityDialog()
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                zap(1)
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                zap(-1)
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+            android.view.KeyEvent.KEYCODE_ENTER -> {
+                if (event.repeatCount == 0) event.startTracking()
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (!qualityButton.hasFocus() && overlaysVisible()) {
+                    qualityButton.requestFocus()
+                    return true
+                }
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (qualityButton.hasFocus()) {
+                    playerView.requestFocus()
+                    return true
+                }
+            }
         }
         showOverlays()
         return super.onKeyDown(keyCode, event)
+    }
+
+    /** OK sostenido: selector de calidad directo. */
+    override fun onKeyLongPress(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+            keyCode == android.view.KeyEvent.KEYCODE_ENTER
+        ) {
+            showQualityDialog()
+            return true
+        }
+        return super.onKeyLongPress(keyCode, event)
+    }
+
+    /** OK corto (al soltar, si no fue pulsación larga): overlays + calidad. */
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if ((keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                    keyCode == android.view.KeyEvent.KEYCODE_ENTER) &&
+            !event.isCanceled
+        ) {
+            if (qualityButton.hasFocus()) {
+                showQualityDialog()
+            } else {
+                showOverlays()
+                qualityButton.requestFocus()
+            }
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     private fun overlaysVisible(): Boolean {
@@ -203,6 +251,12 @@ class PlayerActivity : AppCompatActivity() {
      */
     private fun zap(delta: Int) {
         if (channelIds.size < 2) return
+        // Si el foco estaba en el botón de calidad, devolverlo al reproductor
+        // para que la UI no quede atrapada sobre el video al zapear.
+        if (qualityButton.hasFocus()) {
+            playerView.requestFocus()
+            hideOverlays()
+        }
         currentIndex = (currentIndex + delta + channelIds.size) % channelIds.size
         streamId = channelIds[currentIndex]
         streamTitle = channelTitles.getOrElse(currentIndex) { streamId }
@@ -381,27 +435,15 @@ class PlayerActivity : AppCompatActivity() {
         exo.play()
     }
 
-    /** Calidad elegida por el usuario: "auto" o altura en píxeles (ej. 720). */
-    private fun currentQuality(): String {
-        return getPreferences(MODE_PRIVATE).getString(PREF_QUALITY, "auto") ?: "auto"
-    }
-
-    private fun saveQuality(q: String) {
-        getPreferences(MODE_PRIVATE).edit().putString(PREF_QUALITY, q).apply()
-    }
+    /** Calidad elegida por el usuario: "auto" o altura en píxeles (ej. 720).
+     *  Vive en QualityStore, compartida con la guía TV y el preview. */
+    private fun currentQuality(): String = QualityStore.current(this)
 
     /** Aplica la calidad a los parámetros: auto = sin restricción. */
     private fun applyQuality(
         params: DefaultTrackSelector.Parameters.Builder,
         quality: String
-    ): DefaultTrackSelector.Parameters.Builder {
-        val h = quality.toIntOrNull() ?: 0
-        return if (h > 0) {
-            params.setMaxVideoSize(Int.MAX_VALUE, h).setMinVideoSize(0, h)
-        } else {
-            params.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE).setMinVideoSize(0, 0)
-        }
-    }
+    ): DefaultTrackSelector.Parameters.Builder = QualityStore.apply(params, quality)
 
     private fun updateQualityLabel() {
         val q = currentQuality()
@@ -409,53 +451,12 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * Diálogo de calidad: Automático + las variantes reales del stream.
-     * Funciona con táctil (móvil) y con D-pad (TV).
+     * Diálogo de calidad compartido: Automático + las variantes reales del
+     * stream. Funciona con táctil (móvil) y con D-pad (TV), y abre siempre
+     * (aunque el stream esté cargando o reconectando).
      */
     private fun showQualityDialog() {
-        val exo = player ?: return
-        val ts = trackSelector ?: return
-        val mapped = ts.currentMappedTrackInfo ?: return
-
-        var videoRenderer = -1
-        for (i in 0 until mapped.rendererCount) {
-            if (exo.getRendererType(i) == androidx.media3.common.C.TRACK_TYPE_VIDEO) {
-                videoRenderer = i
-                break
-            }
-        }
-        if (videoRenderer == -1) return
-
-        data class Opt(val height: Int, val label: String)
-        val opts = mutableListOf(Opt(-1, getString(R.string.quality_auto)))
-        val seen = mutableSetOf<Int>()
-        val groups = mapped.getTrackGroups(videoRenderer)
-        for (g in 0 until groups.length) {
-            val group = groups.get(g)
-            for (t in 0 until group.length) {
-                val h = group.getFormat(t).height
-                if (h > 0 && seen.add(h)) opts.add(Opt(h, "${h}p"))
-            }
-        }
-        opts.sortByDescending { it.height }
-
-        val labels = opts.map { it.label }.toTypedArray()
-        val cur = currentQuality()
-        val checked = opts.indexOfFirst {
-            if (cur == "auto") it.height == -1 else it.height.toString() == cur
-        }.coerceAtLeast(0)
-
-        androidx.appcompat.app.AlertDialog.Builder(this, R.style.QualityDialogTheme)
-            .setTitle(R.string.quality_title)
-            .setSingleChoiceItems(labels, checked) { dialog, which ->
-                val opt = opts[which]
-                val q = if (opt.height == -1) "auto" else opt.height.toString()
-                saveQuality(q)
-                ts.setParameters(applyQuality(ts.buildUponParameters(), q).build())
-                updateQualityLabel()
-                dialog.dismiss()
-            }
-            .show()
+        QualityDialog.show(this, trackSelector) { updateQualityLabel() }
     }
 
     /** Reintento automático con backoff: la señal en vivo se recupera sola. */

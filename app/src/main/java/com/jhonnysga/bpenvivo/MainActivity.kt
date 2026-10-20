@@ -219,6 +219,15 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Al volver del reproductor el preview quedó liberado: reactivarlo
+        // con el canal que estaba seleccionado.
+        if (previewPlayer == null) {
+            previewItem?.let { previewChannel(it) }
+        }
+    }
+
     override fun onStop() {
         super.onStop()
         previewPlayer?.release()

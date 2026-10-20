@@ -10,9 +10,17 @@ import androidx.recyclerview.widget.RecyclerView
 /**
  * Guía estilo YouTube TV: canal a la izquierda, programa + hora + progreso.
  * Los items son focusables para D-pad en TV.
+ *
+ * Callbacks:
+ *  - onClick: pulsación/OK sobre el ítem.
+ *  - onFocus: el ítem ganó el foco del D-pad (TV lo usa para el preview).
+ *  - onLongClick: pulsación larga (TV lo usa para abrir la calidad).
  */
-class StreamAdapter(private val onClick: (StreamItem) -> Unit) :
-    RecyclerView.Adapter<StreamAdapter.VH>() {
+class StreamAdapter(
+    private val onClick: (StreamItem) -> Unit,
+    private val onFocus: (StreamItem) -> Unit = {},
+    private val onLongClick: (StreamItem) -> Unit = {}
+) : RecyclerView.Adapter<StreamAdapter.VH>() {
 
     private val items = mutableListOf<StreamItem>()
 
@@ -26,15 +34,19 @@ class StreamAdapter(private val onClick: (StreamItem) -> Unit) :
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_guide, parent, false)
-        return VH(v, onClick)
+        return VH(v, onClick, onFocus, onLongClick)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) = holder.bind(items[position])
 
     override fun getItemCount(): Int = items.size
 
-    class VH(view: View, private val onClick: (StreamItem) -> Unit) :
-        RecyclerView.ViewHolder(view) {
+    class VH(
+        view: View,
+        private val onClick: (StreamItem) -> Unit,
+        private val onFocus: (StreamItem) -> Unit,
+        private val onLongClick: (StreamItem) -> Unit
+    ) : RecyclerView.ViewHolder(view) {
 
         private val channel: TextView = view.findViewById(R.id.guide_channel)
         private val program: TextView = view.findViewById(R.id.guide_program)
@@ -47,6 +59,13 @@ class StreamAdapter(private val onClick: (StreamItem) -> Unit) :
             view.isFocusable = true
             view.isClickable = true
             view.setOnClickListener { item?.let(onClick) }
+            view.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) item?.let(onFocus)
+            }
+            view.setOnLongClickListener {
+                item?.let(onLongClick)
+                true
+            }
         }
 
         fun bind(s: StreamItem) {

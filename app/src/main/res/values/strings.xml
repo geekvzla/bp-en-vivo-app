@@ -22,6 +22,7 @@
     <string name="status_connecting">Conectando…</string>
     <string name="status_buffering">Cargando…</string>
     <string name="status_reconnecting">Señal interrumpida, reconectando… (%1$d)</string>
+    <string name="tv_guide_empty">Sin canales en vivo. Pulsa ⏪ para reintentar.</string>
     <string name="quality_title">Calidad de video</string>
     <string name="quality_auto">Automático</string>
 </resources>
