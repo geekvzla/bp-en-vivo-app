@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsBackupCount: TextView
     private lateinit var settingsClearBackup: Button
 
-    private val adapter = StreamAdapter { previewChannel(it) }
+    private val adapter = StreamAdapter(onClick = { previewChannel(it) })
     private var lastItems: List<StreamItem> = emptyList()
 
     // Preview
