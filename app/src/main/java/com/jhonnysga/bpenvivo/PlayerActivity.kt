@@ -16,7 +16,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -36,9 +36,9 @@ import com.jhonnysga.bpenvivo.MainActivity.Source
  * vivo de Dailymotion servido directo al dispositivo, sin pasar por el PC.
  *
  * Flujo: al iniciar, la app extrae la URL maestra (.m3u8) del video en el
- * propio dispositivo (DailymotionClient) y la reproduce con ExoPlayer
- * enviando los headers necesarios (Referer). La IP que pide el stream es
- * la misma que lo reproduce, como exige el token.
+ * propio dispositivo (DailymotionClient) y la reproduce con ExoPlayer por
+ * la vía de datos por defecto, igual que el preview de la guía. La IP que
+ * pide el stream es la misma que lo reproduce, como exige el token.
  *
  * Estrategia anti-trabones:
  *  1. Tope por defecto en 720p (2.18 Mbps): nítido y estable; el usuario
@@ -311,13 +311,14 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * Fuente de datos sobre el cliente resiliente (DNS normal + DoH de
-     * respaldo) con los headers que Dailymotion exige para el stream.
+     * Fuente de datos por defecto de media3: la misma vía que usa el
+     * preview de la guía, que sí reproduce. Las URL firmadas del CDN se
+     * piden sin cabeceras especiales; la vía anterior (OkHttp con
+     * User-Agent y Referer fijos en cada petición) hacía que la
+     * pantalla completa abriera pero no cargara nunca.
      */
     private fun buildDataSourceFactory(): DataSource.Factory {
-        return OkHttpDataSource.Factory(Net.client)
-            .setUserAgent(DailymotionClient.USER_AGENT)
-            .setDefaultRequestProperties(mapOf("Referer" to DailymotionClient.REFERER))
+        return DefaultDataSource.Factory(this)
     }
 
     private fun buildPlayer(): ExoPlayer {
